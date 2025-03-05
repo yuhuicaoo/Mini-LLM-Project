@@ -10,6 +10,7 @@ eval_interval = 300
 learning_rate = 1e-3
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
+num_embd = 32
 # ---------------------
 
 torch.manual_seed(42)
@@ -80,17 +81,22 @@ def estimate_loss():
 
 # Create a simple bigram model
 class BigramLanguageModel(nn.Module):
-    def __init__(self, vocab_size):
+    def __init__(self):
         super().__init__()
         # each token directly reads off the logits for the next token from a lookup table
         # maps each token in the sequence to its next-token prediction in the form of logits
-        self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
+        self.token_embedding_table = nn.Embedding(vocab_size, num_embd)
+        self.position_embedding_table = nn.Embedding(block_size, num_embd)
+        self.lm_head = nn.Linear(num_embd, vocab_size)
 
     def forward(self, idx, targets=None):
         # idx and targets are both (B,T) tensors of integers
-        logits = self.token_embedding_table(
-            idx
-        )  # (B,T,C) , where C = channel = vocab size
+        B,T = idx.shape
+
+        token_embd = self.token_embedding_table(idx)  # (B,T,C) or (B,T,num_embed) , where C = num_embd = embedding dimension
+        position_embd = self.position_embedding_table(torch.arange(T, device=device)) # (T,C) --> becomes (B,T,C) when adding to token_embd
+        x = token_embd + position_embd # (B,T,C) , x holds both token identity and positions of where the tokens occur
+        logits = self.lm_head(x)  # (B,T,vocab_size)
 
         if targets is None:
             # if no target, just get the logits
@@ -124,7 +130,7 @@ class BigramLanguageModel(nn.Module):
         return idx
 
 
-model = BigramLanguageModel(vocab_size=vocab_size)
+model = BigramLanguageModel()
 m = model.to(device)
 
 # intialise optimiser
