@@ -3,14 +3,17 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 # hyperparamters
-batch_size = 32
-block_size = 8
+batch_size = 64     # how many independent sequences will we process in parallel?
+block_size = 256    # what is the maximum context length for predictions?
 max_iters = 5000
 eval_interval = 500
-learning_rate = 1e-3
+learning_rate = 3e-4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
-num_embd = 32
+num_embd = 192
+num_heads = 6
+num_layers = 4
+dropout = 0.2
 # ---------------------
 
 torch.manual_seed(42)
@@ -91,6 +94,8 @@ class Head(nn.Module):
         # ensures that tril behaves like a constant tensor that follows the model but isnt trained.
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
 
+        self.dropout = nn.Dropout(dropout) # dropout layers for regularisation
+
     def forward(self, x):
         B,T,C = x.shape
 
@@ -101,7 +106,7 @@ class Head(nn.Module):
         weights = q @ torch.transpose(k, dim0=1, dim1=2) * C**-0.5 # (B,T, head_size) @ (B, head_size, T) -> (B,T,T) | Note: head_size == attention_dimension
         weights = weights.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  # (B, T, T)
         weights = F.softmax(weights, dim=-1) # (B, T ,T)
-
+        weights = self.dropout(weights)   # randomly prevent some of the nodes / tokens from communicating
         # perform weighted aggregation on the values , v
         v = self.value(x) # (B,T,head_size)
         out = weights @ v # (B,T,T) @ (B,T,head_size) --> (B,T,head_size)
@@ -114,11 +119,13 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
         self.projection = nn.Linear(num_embd, num_embd)
+        self.dropout = nn.Dropout(dropout) # dropout layers for regularisation
 
     def forward(self, x):
         # concatenate on the channel dimension 
         out_sa = torch.cat([head(x) for head in self.heads], dim=-1) # output of the self-attention
-        out = self.projection(out_sa) # apply projection (linear transformation) to the self-attention output, projection back to the residual pathway
+        # apply projection (linear transformation) to the self-attention output, projection back to the residual pathway
+        out = self.dropout(self.projection(out_sa)) 
         return out
     
 class FeedForwardNetwork(nn.Module):
@@ -130,7 +137,8 @@ class FeedForwardNetwork(nn.Module):
             # apply linear layer on the per-token level, all tokens do this independently
             nn.Linear(num_embd, 4 * num_embd),
             nn.ReLU(),
-            nn.Linear(4 * num_embd, num_embd) # projection (linear transformation) layer, back into the residual pathway
+            nn.Linear(4 * num_embd, num_embd), # projection (linear transformation) layer, back into the residual pathway
+            nn.Dropout(dropout),   # regularisation by adding dropout layers
         )
 
     def forward(self, x):
@@ -148,11 +156,16 @@ class Block(nn.Module):
         self.self_attention = MultiHeadAttention(num_heads, head_size)
         # computation done by feed-forward network on all tokens independently
         self.feedforward = FeedForwardNetwork(num_embd)
-    
+        # add layer-normalisation, for 0-mean and unit(1)-variance across the rows. 
+        self.layer_norm1 = nn.LayerNorm(num_embd)
+        self.layer_norm2 = nn.LayerNorm(num_embd)
+
+
     def forward(self, x):
-        # add x to output of communication and computation (residual connections)
-        x = x + self.self_attention(x)
-        x = x + self.feedforward(x)
+        # add x to output of communication and computation (residual connections) and
+        # apply layer normalisation before the transformations (pre-norm formulation)
+        x = x + self.self_attention(self.layer_norm1(x))
+        x = x + self.feedforward(self.layer_norm2(x))
         return x
 
 
@@ -164,11 +177,8 @@ class BigramLanguageModel(nn.Module):
         # maps each token in the sequence to its next-token prediction in the form of logits
         self.token_embedding_table = nn.Embedding(vocab_size, num_embd)
         self.position_embedding_table = nn.Embedding(block_size, num_embd)
-        self.blocks = nn.Sequential(
-            Block(num_embd, num_heads=4),
-            Block(num_embd, num_heads=4),
-            Block(num_embd, num_heads=4),
-        )
+        self.blocks = nn.Sequential(*[Block(num_embd, num_heads=num_heads) for _ in range(num_layers)])
+        self.layer_norm_final = nn.LayerNorm(num_embd)
         self.lm_head = nn.Linear(num_embd, vocab_size)
 
     def forward(self, idx, targets=None):
