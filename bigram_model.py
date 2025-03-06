@@ -1,17 +1,18 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import tiktoken
 
 # hyperparamters
-batch_size = 64     # how many independent sequences will we process in parallel?
-block_size = 256    # what is the maximum context length for predictions?
-max_iters = 5000
-eval_interval = 500
-learning_rate = 3e-4
+batch_size = 32    # how many independent sequences will we process in parallel?
+block_size = 16     # what is the maximum context length for predictions?
+max_iters = 1000
+eval_interval = 250
+learning_rate = 1e-3
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
-num_embd = 192
-num_heads = 6
+num_embd = 64
+num_heads = 4
 num_layers = 4
 dropout = 0.2
 # ---------------------
@@ -22,21 +23,26 @@ torch.manual_seed(42)
 with open("kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
     lyrics = f.read()
 
-# check all the unique characters that occur in the dataset
-chars = sorted(list(set(lyrics)))
-vocab_size = len(chars)
+# # check all the unique characters that occur in the dataset
+# chars = sorted(list(set(lyrics)))
+# vocab_size = len(chars)
 
-# create a mapping from characters to integers (encoder) and vice-versa (decoder)
-str_to_int = {char: i for i, char in enumerate(chars)}
-int_to_str = {i: char for i, char in enumerate(chars)}
+# # create a mapping from characters to integers (encoder) and vice-versa (decoder)
+# str_to_int = {char: i for i, char in enumerate(chars)}
+# int_to_str = {i: char for i, char in enumerate(chars)}
 
-# encoder takes a string which outputs a list of integers ,
-# characters in string are converted to int via lookup table
-encode = lambda s: [str_to_int[c] for c in s]
+# # encoder takes a string which outputs a list of integers ,
+# # characters in string are converted to int via lookup table
+# encode = lambda s: [str_to_int[c] for c in s]
 
-# decoder takes a list of integers and outputs a string, integers converted via lookup table
-decode = lambda l: "".join([int_to_str[i] for i in l])
+# # decoder takes a list of integers and outputs a string, integers converted via lookup table
+# decode = lambda l: "".join([int_to_str[i] for i in l])
 
+## try using tiktoken tokeniser
+tokeniser = tiktoken.get_encoding('gpt2')
+encode = lambda s: tokeniser.encode(s)
+decode = lambda i: tokeniser.decode(i)
+vocab_size = tokeniser.n_vocab
 
 # Train and validation splits
 data = torch.tensor(encode(lyrics), dtype=torch.long)
@@ -252,4 +258,7 @@ for iter in range(max_iters):
 
 # generate from the model
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+generated_output = decode(m.generate(context, max_new_tokens=500)[0].tolist())
+
+with open("generated_output.txt", 'w', encoding='utf-8') as f:
+    f.write(generated_output)
