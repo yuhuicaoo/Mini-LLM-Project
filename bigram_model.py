@@ -120,6 +120,7 @@ class Head(nn.Module):
 
 class MultiHeadAttention(nn.Module):
     """Class for multi-headed attention"""
+    # different heads are responsible for specialising in learning something different, even if # parameters is the same as one vs many heads
 
     def __init__(self, num_heads, head_size):
         super().__init__()
@@ -222,12 +223,12 @@ class BigramLanguageModel(nn.Module):
             logits, _ = self(idx_cond)
             # only consider last element in the time dimension, becomes (B,C)
             logits = logits[:, -1, :]
-            # apply softmax to get proababilities
+            # apply softmax to get proababilities between 0 to 1.
             probs = F.softmax(logits, dim=-1)  # (B,C)
-            # sample from the distribution, only gets 1 prediction so becomes (B,1)
+            # sample next token from the distribution, only gets 1 prediction so becomes (B,1)
             idx_next = torch.multinomial(probs, num_samples=1)
             # append sampled index to the running sequence
-            idx = torch.cat((idx, idx_next), dim=1)  # (B, T+1)
+            idx = torch.cat((idx, idx_next), dim=1)  # (B,T) --> (B, T+1)
         return idx
 
 
