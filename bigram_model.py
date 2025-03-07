@@ -5,57 +5,26 @@ import tiktoken
 
 # hyperparamters
 batch_size = 32    # how many independent sequences will we process in parallel?
-block_size = 16     # what is the maximum context length for predictions?
-max_iters = 1000
-eval_interval = 250
-learning_rate = 1e-3
+block_size = 128     # what is the maximum context length for predictions?
+max_iters = 2000
+eval_interval = 500
+learning_rate = 3e-4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 eval_iters = 200
-num_embd = 64
-num_heads = 4
-num_layers = 4
-dropout = 0.2
+num_embd = 192
+num_heads = 6
+num_layers = 6
+dropout = 0.3
 # ---------------------
 
-torch.manual_seed(42)
-
-# open and read input file
-with open("kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
-    lyrics = f.read()
-
-# # check all the unique characters that occur in the dataset
-# chars = sorted(list(set(lyrics)))
-# vocab_size = len(chars)
-
-# # create a mapping from characters to integers (encoder) and vice-versa (decoder)
-# str_to_int = {char: i for i, char in enumerate(chars)}
-# int_to_str = {i: char for i, char in enumerate(chars)}
-
-# # encoder takes a string which outputs a list of integers ,
-# # characters in string are converted to int via lookup table
-# encode = lambda s: [str_to_int[c] for c in s]
-
-# # decoder takes a list of integers and outputs a string, integers converted via lookup table
-# decode = lambda l: "".join([int_to_str[i] for i in l])
-
-## try using tiktoken tokeniser
-tokeniser = tiktoken.get_encoding('gpt2')
-encode = lambda s: tokeniser.encode(s)
-decode = lambda i: tokeniser.decode(i)
-vocab_size = tokeniser.n_vocab
-
-# Train and validation splits
-data = torch.tensor(encode(lyrics), dtype=torch.long)
-# split 90% of our data into train and have remaining 10% as our validation
-n = int(0.9 * len(data))
-train_data = data[:n]
-val_data = data[n:]
-
-
 # data loading
-def get_batch(split):
+def get_batch(data, split, split_percent=0.9):
     # generate a small batch of data for inputs x and targets y
-    data = train_data if split == "train" else val_data
+    n = int(split_percent * len(data))
+    if split == "train":
+        data = data[:n]
+    else:
+        data = data[n:]
 
     # generate a tensor of random integers, that represent the starting position of each sequence of data
     batch_start_indicies = torch.randint(
@@ -70,17 +39,17 @@ def get_batch(split):
     y = torch.stack(
         [data[index + 1 : index + block_size + 1] for index in batch_start_indicies]
     )
-    return x, y
+    return x.to(device), y.to(device)
 
 
 @torch.no_grad()
-def estimate_loss():
+def estimate_loss(model, data):
     out = {}
     model.eval()
     for split in ["train", "val"]:
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
-            X, Y = get_batch(split)
+            X, Y = get_batch(data,split)
             logits, loss = model(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
@@ -178,7 +147,7 @@ class Block(nn.Module):
 
 # Create a simple bigram model
 class BigramLanguageModel(nn.Module):
-    def __init__(self):
+    def __init__(self, vocab_size):
         super().__init__()
         # each token directly reads off the logits for the next token from a lookup table
         # maps each token in the sequence to its next-token prediction in the form of logits
@@ -231,35 +200,64 @@ class BigramLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)  # (B,T) --> (B, T+1)
         return idx
 
+def main():
+    torch.manual_seed(42)
 
-model = BigramLanguageModel()
-m = model.to(device)
+    # open and read input file
+    with open("kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
+        lyrics = f.read()
 
-# intialise optimiser
-optimiser = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    
+    # # check all the unique characters that occur in the dataset
+    # chars = sorted(list(set(lyrics)))
+    # vocab_size = len(chars)
 
-# training loop
-for iter in range(max_iters):
+    # # create a mapping from characters to integers (encoder) and vice-versa (decoder)
+    # str_to_int = {char: i for i, char in enumerate(chars)}
+    # int_to_str = {i: char for i, char in enumerate(chars)}
 
-    # every once in a while evaulate the loss on train and val sets
-    if iter % eval_interval == 0:
-        losses = estimate_loss()
-        print(
-            f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
-        )
+    # # encoder takes a string which outputs a list of integers ,
+    # # characters in string are converted to int via lookup table
+    # encode = lambda s: [str_to_int[c] for c in s]
 
-    # get a batch sample from data
-    xb, yb = get_batch("train")
+    # # decoder takes a list of integers and outputs a string, integers converted via lookup table
+    # decode = lambda l: "".join([int_to_str[i] for i in l])
 
-    # evaluate loss
-    logits, loss = model(xb, yb)
-    optimiser.zero_grad(set_to_none=True)
-    loss.backward()
-    optimiser.step()
+    ## try using tiktoken tokeniser
+    tokeniser = tiktoken.get_encoding('gpt2')
+    encode = lambda s: tokeniser.encode(s)
+    decode = lambda i: tokeniser.decode(i)
+    vocab_size = tokeniser.n_vocab
 
-# generate from the model
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-generated_output = decode(m.generate(context, max_new_tokens=500)[0].tolist())
+    # Train and validation splits
+    data = torch.tensor(encode(lyrics), dtype=torch.long)
 
-with open("generated_output.txt", 'w', encoding='utf-8') as f:
-    f.write(generated_output)
+    model = BigramLanguageModel(vocab_size)
+    model = model.to(device)
+
+    # intialise optimiser
+    optimiser = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+
+    # training loop
+    for iter in range(max_iters):
+
+        # every once in a while evaulate the loss on train and val sets
+        if iter % eval_interval == 0:
+            losses = estimate_loss(model, data)
+            print(
+                f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
+            )
+
+        # get a batch sample from data
+        xb, yb = get_batch(data, "train")
+
+        # evaluate loss
+        logits, loss = model(xb, yb)
+        optimiser.zero_grad(set_to_none=True)
+        loss.backward()
+        optimiser.step()
+
+    torch.save(model.state_dict(), 'model.pth')
+
+if __name__ == "__main__":
+    main()
