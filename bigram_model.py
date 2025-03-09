@@ -208,7 +208,6 @@ def main():
     with open("kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
         lyrics = f.read()
 
-    
     # # check all the unique characters that occur in the dataset
     # chars = sorted(list(set(lyrics)))
     # vocab_size = len(chars)
@@ -227,7 +226,6 @@ def main():
     ## try using tiktoken tokeniser
     tokeniser = tiktoken.get_encoding('gpt2')
     encode = lambda s: tokeniser.encode(s)
-    decode = lambda i: tokeniser.decode(i)
     vocab_size = tokeniser.n_vocab
 
     # Train and validation splits

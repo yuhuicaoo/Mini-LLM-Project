@@ -8,17 +8,7 @@ def load_lyrics(file_path):
         lyrics = f.read()
     return lyrics
 
-
-def encode_data(data, tokeniser):
-    """Encode the data (lyrics) using the tokeniser provided"""
-    return tokeniser.encode(data)
-
-
-def decode_data(data, tokeniser):
-    return tokeniser.decode(data)
-
-
-def get_batch(data, batch_size, block_size, split="train"):
+def get_batch(data, batch_size, block_size, device, split="train"):
     """generate a small batch of data for inputs x and targets y"""
 
     def split_data(data, split="train"):
@@ -43,4 +33,4 @@ def get_batch(data, batch_size, block_size, split="train"):
     y = torch.stack(
         [data[index + 1 : index + block_size + 1] for index in batch_start_indicies]
     )
-    return x, y
+    return x.to(device), y.to(device)

@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from bigram_model import BigramLanguageModel
 import tiktoken
 
@@ -17,5 +18,5 @@ model.eval()
 context = torch.tensor(tokeniser.encode("Write me a song \n"), dtype=torch.long, device=device).unsqueeze(0)
 generated_output = tokeniser.decode(model.generate(context, max_new_tokens=500)[0].tolist())
 
-with open("generated_output.txt", 'w', encoding='utf-8') as f:
+with open("generated_outputs/generated_output.txt", 'w', encoding='utf-8') as f:
     f.write(generated_output)
