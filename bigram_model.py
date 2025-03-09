@@ -94,7 +94,7 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-        self.projection = nn.Linear(num_embd * head_size, num_embd)
+        self.projection = nn.Linear(num_heads * head_size, num_embd)
         self.dropout = nn.Dropout(dropout) # dropout layers for regularisation
 
     def forward(self, x):
@@ -154,7 +154,7 @@ class BigramLanguageModel(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, num_embd)
         self.position_embedding_table = nn.Embedding(block_size, num_embd)
         self.blocks = nn.Sequential(*[Block(num_embd, num_heads=num_heads) for _ in range(num_layers)])
-        self.layer_norm_final = nn.LayerNorm(num_embd)
+        self.layer_norm_final = nn.LayerNorm(num_embd)  # final layer norm
         self.lm_head = nn.Linear(num_embd, vocab_size)
 
     def forward(self, idx, targets=None):
@@ -165,6 +165,7 @@ class BigramLanguageModel(nn.Module):
         position_embd = self.position_embedding_table(torch.arange(T, device=device)) # (T,C) --> becomes (B,T,C) when adding to token_embd
         x = token_embd + position_embd # (B,T,C) , x holds both token identity and positions of where the tokens occur
         x = self.blocks(x) # (B,T,C)
+        x = self.layer_norm_final(x) # (B,T,C)
         logits = self.lm_head(x)  # (B,T,vocab_size)
 
         if targets is None:

@@ -24,7 +24,7 @@ class Head(nn.Module):
         q = self.query(x)
         
         # compute attention scores ("affinities" between tokens) using "scaled-attention"
-        weights = q @ torch.transpose(k, dim0=1, dim1=2) * C**-0.5 # (B,T, head_size) @ (B, head_size, T) -> (B,T,T) | Note: head_size == attention_dimension
+        weights = q @ torch.transpose(k, dim0=1, dim1=2) * k.shape[-1]**-0.5 # (B,T, head_size) @ (B, head_size, T) -> (B,T,T) | Note: head_size == attention_dimension
         weights = weights.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  # (B, T, T)
         weights = F.softmax(weights, dim=-1) # (B, T ,T)
         weights = self.dropout(weights)   # randomly prevent some of the nodes / tokens from communicating

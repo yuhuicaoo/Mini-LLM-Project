@@ -7,7 +7,7 @@ tokeniser = tiktoken.get_encoding('gpt2')
 
 
 model = BigramLanguageModel(tokeniser.n_vocab)
-model.load_state_dict(torch.load('model.pth', weights_only=True))
+model.load_state_dict(torch.load('models/model.pth', weights_only=True))
 model = model.to(device)
 
 model.eval()
