@@ -74,11 +74,11 @@ class Head(nn.Module):
     def forward(self, x):
         B,T,C = x.shape
 
-        k = self.key(x)
-        q = self.query(x)
+        k = self.key(x)      # (B,T, head_size)
+        q = self.query(x)    # (B,T, head_size)
         
         # compute attention scores ("affinities" between tokens) using "scaled-attention"
-        weights = q @ torch.transpose(k, dim0=1, dim1=2) * C**-0.5 # (B,T, head_size) @ (B, head_size, T) -> (B,T,T) | Note: head_size == attention_dimension
+        weights = q @ torch.transpose(k, dim0=1, dim1=2) * k.shape[-1]**-0.5 # (B,T, head_size) @ (B, head_size, T) -> (B,T,T) | Note: head_size == attention_dimension
         weights = weights.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  # (B, T, T)
         weights = F.softmax(weights, dim=-1) # (B, T ,T)
         weights = self.dropout(weights)   # randomly prevent some of the nodes / tokens from communicating
@@ -94,7 +94,7 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-        self.projection = nn.Linear(num_embd, num_embd)
+        self.projection = nn.Linear(num_embd * head_size, num_embd)
         self.dropout = nn.Dropout(dropout) # dropout layers for regularisation
 
     def forward(self, x):
@@ -138,7 +138,7 @@ class Block(nn.Module):
 
 
     def forward(self, x):
-        # add x to output of communication and computation (residual connections) and
+        # add x to output of communication and computation (residual/skip connections) and
         # apply layer normalisation before the transformations (pre-norm formulation)
         x = x + self.self_attention(self.layer_norm1(x))
         x = x + self.feedforward(self.layer_norm2(x))
@@ -257,7 +257,7 @@ def main():
         loss.backward()
         optimiser.step()
 
-    torch.save(model.state_dict(), 'model.pth')
+    torch.save(model.state_dict(), 'models/model.pth')
 
 if __name__ == "__main__":
     main()
