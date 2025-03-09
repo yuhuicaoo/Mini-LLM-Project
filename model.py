@@ -109,7 +109,7 @@ class BigramLanguageModel(nn.Module):
         B,T = idx.shape
 
         token_embd = self.token_embedding_table(idx)  # (B,T,C) or (B,T,num_embed) , where C = num_embd = embedding dimension
-        position_embd = self.position_embedding_table(torch.arange(T, device=self.device)) # (T,C) --> becomes (B,T,C) when adding to token_embd
+        position_embd = self.position_embedding_table(torch.arange(T, device=self.device)) # (T,C) --> becomes (B,T,C) when adding to token_embd, Pytorch adds batch dimension when doing this operation
         x = token_embd + position_embd # (B,T,C) , x holds both token identity and positions of where the tokens occur
         x = self.blocks(x) # (B,T,C)
         x = self.layer_norm_final(x) # (B,T,C)
