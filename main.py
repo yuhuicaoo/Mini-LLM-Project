@@ -10,7 +10,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 torch.manual_seed(42)
 
-lyrics = load_lyrics("kendrick_lamar_lyrics.txt")
+lyrics = load_lyrics("data/kendrick_lamar_lyrics.txt")
 tokeniser = tiktoken.get_encoding("gpt2")
 encode = lambda s: tokeniser.encode(s)
 vocab_size = tokeniser.n_vocab

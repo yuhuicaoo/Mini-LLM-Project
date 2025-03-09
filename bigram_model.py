@@ -205,7 +205,7 @@ def main():
     torch.manual_seed(42)
 
     # open and read input file
-    with open("kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
+    with open("data/kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
         lyrics = f.read()
 
     # # check all the unique characters that occur in the dataset
