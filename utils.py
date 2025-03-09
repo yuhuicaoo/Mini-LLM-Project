@@ -3,8 +3,9 @@ from data_preprocessing import get_batch
 from model import BigramLanguageModel
 
 @torch.no_grad()
-def estimate_loss(data, model, eval_iters, batch_size, block_size, device):
+def estimate_metrics(data, model, eval_iters, batch_size, block_size, device):
     out = {}
+    total_loss , num_tokens = 0, 0
     model.eval()
     for split in ["train", "val"]:
         losses = torch.zeros(eval_iters)
@@ -12,7 +13,15 @@ def estimate_loss(data, model, eval_iters, batch_size, block_size, device):
             X, Y = get_batch(data,batch_size,block_size,device,split=split)
             _, loss = model(X, Y)
             losses[k] = loss.item()
-        out[split] = losses.mean()
+
+            total_loss += loss.item() * X.shape[1]
+            num_tokens += X.shape[1]
+        
+        avg_loss = total_loss / num_tokens
+        perplexity = torch.exp(torch.tensor(avg_loss))
+
+
+        out[split] = {'loss': losses.mean(), "perplexity": perplexity.item()}
     model.train()
     return out
 

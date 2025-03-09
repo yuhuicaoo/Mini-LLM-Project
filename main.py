@@ -1,7 +1,7 @@
 import torch
 from model import BigramLanguageModel
 from data_preprocessing import load_lyrics, get_batch
-from utils import estimate_loss
+from utils import estimate_metrics
 import tiktoken
 from config import *
 
@@ -23,13 +23,13 @@ model = model.to(device)
 optimiser = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
 
 # training loop
-for iter in range(max_iters):
+for iter in range(max_iters+1):
 
     # every once in a while evaulate the loss on train and val sets
     if iter % eval_interval == 0:
-        losses = estimate_loss(data, model, eval_iters, batch_size, block_size, device)
+        metrics = estimate_metrics(data, model, eval_iters, batch_size, block_size, device)
         print(
-            f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
+            f"step {iter}: train loss {metrics['train']['loss']:.4f}, train ppl {metrics['train']['perplexity']:.2f}, val loss {metrics['val']['loss']:.4f}, val ppl {metrics['val']['perplexity']:.2f}"
         )
 
     # get a batch sample from data

@@ -37,8 +37,8 @@ model = model.to(device)
 model.eval()
 
 # generate from the model
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-# context = torch.tensor(tokeniser.encode("Write me a song \n"), dtype=torch.long, device=device).unsqueeze(0)
+# context = torch.zeros((1, 1), dtype=torch.long, device=device)
+context = torch.tensor(tokeniser.encode("Write me a song \n"), dtype=torch.long, device=device).unsqueeze(0)
 generated_output = tokeniser.decode(generate(model, context, max_new_tokens=500, block_size=block_size, device=device)[0].tolist())
 
 with open("generated_outputs/generated_output2.txt", 'w', encoding='utf-8') as f:
