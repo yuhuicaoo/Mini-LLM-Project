@@ -9,6 +9,7 @@ def load_lyrics(file_path):
     return lyrics
 
 def get_batch(data, batch_size, block_size, device, split="train"):
+    torch.manual_seed(42)
     """generate a small batch of data for inputs x and targets y"""
 
     def split_data(data, split="train"):

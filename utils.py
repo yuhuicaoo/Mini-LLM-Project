@@ -1,6 +1,5 @@
 import torch
 from data_preprocessing import get_batch
-from model import BigramLanguageModel
 
 @torch.no_grad()
 def estimate_metrics(data, model, eval_iters, batch_size, block_size, device):
