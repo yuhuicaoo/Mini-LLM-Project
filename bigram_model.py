@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import tiktoken
+import matplotlib.pyplot as plt
 
 # hyperparamters
 batch_size = 32    # how many independent sequences will we process in parallel?
@@ -16,6 +17,8 @@ num_heads = 6
 num_layers = 6
 dropout = 0.3
 # ---------------------
+
+torch.manual_seed(42)
 
 # data loading
 def get_batch(data, split, split_percent=0.9):
@@ -202,8 +205,6 @@ class BigramLanguageModel(nn.Module):
         return idx
 
 def main():
-    torch.manual_seed(42)
-
     # open and read input file
     with open("data/kendrick_lamar_lyrics.txt", "r", encoding="utf-8") as f:
         lyrics = f.read()
@@ -225,14 +226,12 @@ def main():
 
     ## try using tiktoken tokeniser
     tokeniser = tiktoken.get_encoding('gpt2')
-    encode = lambda s: tokeniser.encode(s)
     vocab_size = tokeniser.n_vocab
 
     # Train and validation splits
-    data = torch.tensor(encode(lyrics), dtype=torch.long)
+    data = torch.tensor(tokeniser.encode(lyrics), dtype=torch.long)
 
-    model = BigramLanguageModel(vocab_size)
-    model = model.to(device)
+    model = BigramLanguageModel(vocab_size).to(device)
 
     # intialise optimiser
     optimiser = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
@@ -241,7 +240,7 @@ def main():
     for iter in range(max_iters):
 
         # every once in a while evaulate the loss on train and val sets
-        if iter % eval_interval == 0:
+        if iter % eval_interval == 0 or iter == max_iters - 1:
             losses = estimate_loss(model, data)
             print(
                 f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}"
@@ -251,12 +250,12 @@ def main():
         xb, yb = get_batch(data, "train")
 
         # evaluate loss
-        logits, loss = model(xb, yb)
+        _, loss = model(xb, yb)
         optimiser.zero_grad(set_to_none=True)
         loss.backward()
         optimiser.step()
 
-    torch.save(model.state_dict(), 'models/model.pth')
+    torch.save(model.state_dict(), 'models/model2.pth')
 
 if __name__ == "__main__":
     main()
